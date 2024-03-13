@@ -1,0 +1,68 @@
+name: asssist_stack
+version: "3"
+services:
+#-------------------------------------          
+    openwakeword:  
+      image: homeassistant/amd64-addon-openwakeword:latest  
+      container_name: openwakeword  
+  
+      entrypoint: python3  
+      command: > 
+        -m wyoming_openwakeword  
+        --uri 'tcp://0.0.0.0:10400'
+        --preload-model 'alexa'  
+        --debug  
+        --custom-model-dir /share/openwakeword  
+      ports:  
+        - 10400:10400  
+      environment:  
+          - PUID=1004
+          - PGID=1006
+          - TZ=US/Mountain
+      volumes:  
+        - ./openwakeword/data:/data  
+        - ./openwakeword/custom-model-dir:/share/openwakeword  
+      restart: unless-stopped  
+      
+#---------------------------------------- 
+    smoochie-satellite:
+      container_name: smoochie-satellite
+      build: https://github.com/treysullivent/wyoming-satellite.git
+      image: wyoming-satellite
+      hostname: smoochie-satellite
+      restart: unless-stopped
+      ports:
+        - "10700:10700"      
+      group_add:
+        - audio
+      env_file:
+        - ./wyoming-satellite/.env        
+      environment:
+        - PULSE_SERVER=tcp:172.17.0.1:34567
+        - PUID=1004
+        - PGID=1006
+        - TZ=US/Mountain 
+      command:
+        - "--name"
+        - "smoochie-satellite"
+        - "--uri"
+        - "tcp://0.0.0.0:10700"
+        - "--mic-command"
+        - "parecord --property=media.role=phone --rate=16000 --channels=1 --format=s16le --raw --latency-msec 10"
+        - "--snd-command"
+        - "paplay --property=media.role=announce --rate=44100 --channels=1 --format=s16le --raw --latency-msec 10" 
+        - "--snd-command-rate"
+        - "44100"
+        #- "--detection-command"
+        #- "/home/<your_username>/wyoming-enhancements/snapcast/scripts/awake.sh"
+        #- "--tts-stop-command"
+        #- "/home/<your_username>/wyoming-enhancements/snapcast/scripts/done.sh"
+        - "--debug"
+        - "--awake-wav"
+        - "sounds/awake.wav"
+        - "--done-wav"
+        - "sounds/done.wav"
+        - "--wake-uri"
+        - "tcp://openwakeword:10400"
+        - "--wake-word-name"
+        - "alexa"
